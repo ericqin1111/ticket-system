@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # 1. MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-ticket
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=ticket_system
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - ticket-system-net
+
+  # 2. Redis 缓存
+  redis:
+    image: redis:7.0
+    container_name: redis-ticket
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass 123456 # 设置密码
+    volumes:
+      - redis-data:/data
+    networks:
+      - ticket-system-net
+
+  # 3. Zookeeper (Kafka 依赖)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper-ticket
+    restart: always
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ticket-system-net
+
+  # 4. Kafka 消息队列
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka-ticket
+    restart: always
+    ports:
+      - "29092:29092" # 暴露给宿主机（我们的Java应用）的端口
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      # 关键配置：同时为容器内和容器外（宿主机）配置监听器
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ticket-system-net
+
+  # 5. Nacos 服务注册与发现 & 配置中心
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: nacos-ticket
+    restart: always
+    ports:
+      - "8848:8848" # 控制台端口
+      - "9848:9848" # gRPC 端口
+      - "9849:9849"
+    environment:
+      - MODE=standalone # 单机模式
+      - PREFER_HOST_MODE=hostname
+    volumes:
+      - nacos-logs:/home/nacos/logs
+    networks:
+      - ticket-system-net
+
+  # 6. Prometheus 监控
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus-ticket
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml # 挂载配置文件
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - ticket-system-net
+
+  # 7. Grafana 可视化面板
+  grafana:
+    image: grafana/grafana:9.5.3
+    container_name: grafana-ticket
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    networks:
+      - ticket-system-net
+
+# 定义数据卷
+volumes:
+  mysql-data:
+  redis-data:
+  nacos-logs:
+  prometheus-data:
+  grafana-data:
+
+# 定义网络
+networks:
+  ticket-system-net:
+    driver: bridge
