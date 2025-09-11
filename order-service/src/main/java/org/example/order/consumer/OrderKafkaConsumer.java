@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import org.example.order.DTO.CreateOrderRequest;
+import org.example.order.DTO.OrderCreationMessage;
 import org.example.order.feign.InventoryFeignClient;
 import org.example.order.service.Impl.OrderServiceImpl;
 import org.slf4j.Logger;
@@ -30,23 +31,21 @@ public class OrderKafkaConsumer {
         log.info("接收到创建订单的请求: {}",message);
 
         try {
-            CreateOrderRequest request=objectMapper.readValue(message,CreateOrderRequest.class);
-            boolean dbDeductStatus = inventoryFeignClient.deductStockInDB(request.getTicketItemId(),request.getQuantity());
-            if(dbDeductStatus){
-                log.info("开始创建订单 TicketItemId: {}",request.getTicketItemId());
-                orderService.createOrderInDB(request);
-            }
-            else{
-                log.warn("数据库扣减失败，需要回补缓存  TicketItemId: {}",request.getTicketItemId());
-                inventoryFeignClient.rollbackStockInCache(request.getTicketItemId(), request.getQuantity());
-            }
+            OrderCreationMessage request = objectMapper.readValue(message, OrderCreationMessage.class);
 
-        }catch (JsonProcessingException e){
-            log.error("反序列化订单消息失败 {}",message,e);
+            // 调用包含核心业务逻辑的 service 方法
+            orderService.processOrderCreation(request);
+
+        } catch (JsonProcessingException e) {
+            log.error("反序列化订单消息失败 {}", message, e);
+            // 这种错误通常无法重试，可以直接签收
+        } catch (Exception e) {
+            log.error("处理订单消息时发生未知错误，将等待重试 {}", message, e);
+            // 抛出异常，触发 Kafka 的重试机制
+            throw new RuntimeException(e);
         }
-        catch (Exception e){
-            log.error("处理订单消息时发生未知错误 {}",message,e);
-        }
+
+
     }
 
 

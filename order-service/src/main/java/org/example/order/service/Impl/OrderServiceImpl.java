@@ -1,5 +1,6 @@
 package org.example.order.service.Impl;
 
+import org.example.order.DTO.OrderCreationMessage;
 import org.example.order.entity.Order;
 
 import org.example.order.DTO.CreateOrderRequest;
@@ -11,11 +12,16 @@ import org.example.order.service.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -31,39 +37,93 @@ public class OrderServiceImpl implements OrderService {
     @Resource
     ObjectMapper objectMapper;
 
+    @Resource
+    RedisTemplate redisTemplate;
+
     private final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     @Override
-    public boolean createOrderRequest(CreateOrderRequest request) {
-        boolean deductStatus = inventoryFeignClient.preDeductStock(request.getTicketItemId(), request.getQuantity());
+    public String createOrderRequest(Long userId,CreateOrderRequest request) {
 
-        if (!deductStatus) {
-            log.warn("预扣减失败，下单被拒绝 UserId: {},TicketItemId: {}", request.getUserId(), request.getTicketItemId());
-            return false;
+        String lockKey = "lock:order:create:userId:" + userId + ":ticketItemId:" + request.getTicketItemId();
+        Boolean isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", 10, TimeUnit.SECONDS);
+
+        if (Boolean.FALSE.equals(isLocked)) {
+            log.warn("重复的下单请求被拒绝, UserId: {}, TicketItemId: {}", userId, request.getTicketItemId());
+            return null; // 或者 throw new DuplicateRequestException("请勿重复提交");
         }
 
+
+
         try{
-            String message =  objectMapper.writeValueAsString(request);
-            kafkaTemplate.send("ORDER_TOPIC", message);
+            boolean deductStatus = inventoryFeignClient.preDeductStock(request.getTicketItemId(), request.getQuantity());
+
+            if (!deductStatus) {
+                log.warn("预扣减失败，下单被拒绝 UserId: {},TicketItemId: {}", request.getUserId(), request.getTicketItemId());
+                return null;
+            }
+
+            String orderSerialNo = UUID.randomUUID().toString().replace("-", "");
+            OrderCreationMessage message = new OrderCreationMessage(
+                    userId, // <-- 关键改动：设置用户ID
+                    request.getTicketItemId(),
+                    request.getQuantity(),
+                    orderSerialNo
+            );
+            String req =  objectMapper.writeValueAsString(message);
+            kafkaTemplate.send("order_topics", req);
+
             log.info("库存预扣款成功,已发送创建消息至kafka,消息内容:{}", message);
-            return true;
+            return orderSerialNo;
         }
         catch (Exception e){
             log.error("订单序列化失败",e);
-            return false;
+            return null;
         }
     }
 
-    public void createOrderInDB(CreateOrderRequest request){
+    public void createOrderInDB(OrderCreationMessage request){
         Order order=new Order();
 
-        order.setOrderSn(UUID.randomUUID().toString().replace("-",""));
+        order.setOrderSn(request.getOrderSerialNo());
         order.setUserId(request.getUserId());
         BigDecimal price=new  BigDecimal(50);
-        order.setTotalPrice(price.multiply(new BigDecimal(request.getQuantity())));
+        order.setTotalAmount(price.multiply(new BigDecimal(request.getQuantity())));
         order.setStatus(1);
+        order.setCreateTime(LocalDateTime.now());
+        order.setUpdateTime(LocalDateTime.now());
 
         orderMapper.insert(order);
         log.info("订单创建成功,ID:{}",order.getOrderSn());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void processOrderCreation(OrderCreationMessage request) {
+        try {
+            // 1. 实际扣减数据库库存 (Feign 调用)
+            // 这一步也需要幂等，或者支持重复调用无副作用
+            boolean dbDeductStatus = inventoryFeignClient.deductStockInDB(request.getTicketItemId(), request.getQuantity());
+
+            if (dbDeductStatus) {
+                log.info("数据库库存扣减成功，开始创建订单 TicketItemId: {}", request.getTicketItemId());
+
+                // 2. 创建订单并插入数据库
+                // 这一步是幂等性的关键
+                this.createOrderInDB(request);
+
+            } else {
+                log.warn("数据库扣减失败，需要回补缓存  TicketItemId: {}", request.getTicketItemId());
+                inventoryFeignClient.rollbackStockInCache(request.getTicketItemId(), request.getQuantity());
+                // 考虑是否需要抛出异常以进行重试
+            }
+        } catch (DuplicateKeyException e) {
+            // 捕获唯一键冲突异常
+            // 这不是一个错误！这是幂等性保证机制成功拦截了重复消息！
+            log.warn("幂等性检查：订单已存在，忽略重复消息. OrderSN: {}", request.getOrderSerialNo());
+            // 什么都不做，方法正常结束，Kafka 会认为消息已成功消费
+        }
+        // 其他所有 Exception 会因为 @Transactional 注解而导致事务回滚，
+        // 并且会冒泡到 KafkaListener，触发重试。
     }
 }

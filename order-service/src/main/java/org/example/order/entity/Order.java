@@ -17,7 +17,7 @@ public class Order {
 
     Long userId;
 
-    private BigDecimal totalPrice;
+    private BigDecimal totalAmount;
 
     private Integer status;
 

@@ -1,0 +1,48 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    gateway:
+      discovery:
+        locator:
+          enabled: true # 开启从 Nacos 自动发现路由
+          lower-case-service-id: true # 将服务名转为小写
+      routes:
+        - id: order_route
+          uri: lb://order-service # 路由到订单服务
+          predicates:
+            - Path=/api/orders/** # 匹配路径
+          filters:
+            - StripPrefix=1 # 转发时去掉第一层路径 /api
+
+        - id: user_route
+          uri: lb://user-service
+          predicates:
+            - Path=/api/user/** # 匹配所有 /api/user/ 开头的请求
+          filters:
+            - StripPrefix=1 # 转发时去掉 /api
+# JWT Configuration
+jwt:
+  secret: "bXktc2VjcmV0LWtleS1mb3ItdGlja2V0LXN5c3RlbS1pcy1zby1zZWN1cmUtYW5kLWxvbmc="
+
+# 认证白名单配置
+auth:
+  skip-urls:
+    - /api/user/register
+    - /api/user/login
+
+logging:
+  level:
+    # 将 Spring Cloud Gateway 相关的日志级别设为 TRACE，这是最详细的级别
+    org.springframework.cloud.gateway: TRACE
+    # 查看响应式服务器的日志
+    org.springframework.http.server.reactive: DEBUG
+    # 查看 WebFlux 相关的日志
+    org.springframework.web.reactive: DEBUG
+    # 查看底层 Netty 服务器的日志
+    reactor.netty: DEBUG

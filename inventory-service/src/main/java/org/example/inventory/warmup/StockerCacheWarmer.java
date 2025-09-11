@@ -9,9 +9,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Component
 public class StockerCacheWarmer implements ApplicationRunner {
     public static final String STOCKER_KEY_PREFIX = RedisKeyConstants.STOCKER_KEY_PREFIX;
 
