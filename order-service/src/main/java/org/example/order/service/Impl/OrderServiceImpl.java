@@ -1,13 +1,16 @@
 package org.example.order.service.Impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.example.order.DTO.OrderCreationMessage;
 import org.example.order.entity.Order;
 
 import org.example.order.DTO.CreateOrderRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
+import org.example.order.entity.Outbox;
 import org.example.order.feign.InventoryFeignClient;
 import org.example.order.mapper.OrderMapper;
+import org.example.order.mapper.OutboxMapper;
 import org.example.order.service.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +40,9 @@ public class OrderServiceImpl implements OrderService {
     @Resource
     ObjectMapper objectMapper;
 
+    @Autowired
+    OutboxMapper outboxMapper;
+
     @Resource
     RedisTemplate redisTemplate;
 
@@ -53,27 +59,39 @@ public class OrderServiceImpl implements OrderService {
             return null; // 或者 throw new DuplicateRequestException("请勿重复提交");
         }
 
+        boolean deductStatus = inventoryFeignClient.preDeductStock(request.getTicketItemId(), request.getQuantity());
 
+        if (!deductStatus) {
+            log.warn("预扣减失败，下单被拒绝 UserId: {},TicketItemId: {}", request.getUserId(), request.getTicketItemId());
+            return null;
+        }
 
         try{
-            boolean deductStatus = inventoryFeignClient.preDeductStock(request.getTicketItemId(), request.getQuantity());
 
-            if (!deductStatus) {
-                log.warn("预扣减失败，下单被拒绝 UserId: {},TicketItemId: {}", request.getUserId(), request.getTicketItemId());
-                return null;
-            }
+
 
             String orderSerialNo = UUID.randomUUID().toString().replace("-", "");
+
+
+
             OrderCreationMessage message = new OrderCreationMessage(
                     userId, // <-- 关键改动：设置用户ID
                     request.getTicketItemId(),
                     request.getQuantity(),
                     orderSerialNo
             );
-            String req =  objectMapper.writeValueAsString(message);
-            kafkaTemplate.send("order_topics", req);
 
-            log.info("库存预扣款成功,已发送创建消息至kafka,消息内容:{}", message);
+            createOrderInDB(message);
+
+            Outbox outboxEvent = new Outbox();
+            outboxEvent.setId(UUID.randomUUID().toString());
+            outboxEvent.setAggregateType("Order");
+            outboxEvent.setAggregateId(orderSerialNo);
+            outboxEvent.setEventType("OrderCreated");
+            outboxEvent.setPayload(objectMapper.writeValueAsString(message)); // 序列化为 JSON
+
+            outboxMapper.insert(outboxEvent);
+
             return orderSerialNo;
         }
         catch (Exception e){
@@ -89,7 +107,7 @@ public class OrderServiceImpl implements OrderService {
         order.setUserId(request.getUserId());
         BigDecimal price=new  BigDecimal(50);
         order.setTotalAmount(price.multiply(new BigDecimal(request.getQuantity())));
-        order.setStatus(1);
+        order.setStatus(0);
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
 
@@ -108,15 +126,21 @@ public class OrderServiceImpl implements OrderService {
             if (dbDeductStatus) {
                 log.info("数据库库存扣减成功，开始创建订单 TicketItemId: {}", request.getTicketItemId());
 
-                // 2. 创建订单并插入数据库
-                // 这一步是幂等性的关键
-                this.createOrderInDB(request);
+                int updatedRows = orderMapper.updateStatus(request.getOrderSerialNo(), 1);
+                if (updatedRows == 0) {
+                    log.warn("Order not found or status already updated for OrderSN: {}", request.getOrderSerialNo());
+                    // 可能是一个重复消息，或者订单不存在，需要有相应的处理
+                }
 
             } else {
                 log.warn("数据库扣减失败，需要回补缓存  TicketItemId: {}", request.getTicketItemId());
                 inventoryFeignClient.rollbackStockInCache(request.getTicketItemId(), request.getQuantity());
                 // 考虑是否需要抛出异常以进行重试
             }
+
+
+
+            log.info("Order {} confirmed.", request.getOrderSerialNo());
         } catch (DuplicateKeyException e) {
             // 捕获唯一键冲突异常
             // 这不是一个错误！这是幂等性保证机制成功拦截了重复消息！

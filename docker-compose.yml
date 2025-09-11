@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # 1. MySQL 数据库
@@ -13,6 +12,7 @@ services:
       - MYSQL_DATABASE=ticket_system
     volumes:
       - mysql-data:/var/lib/mysql
+      - ~/conf/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     networks:
       - ticket-system-net
@@ -54,14 +54,19 @@ services:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper-ticket:2181'
       # 关键配置：同时为容器内和容器外（宿主机）配置监听器
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-ticket:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
       - ticket-system-net
+    healthcheck:
+      test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # 5. Nacos 服务注册与发现 & 配置中心
   nacos:
@@ -111,6 +116,38 @@ services:
       - prometheus
     networks:
       - ticket-system-net
+
+
+  connect:
+    image: debezium/connect:2.1
+    container_name: connect-ticket
+    restart: always
+    ports:
+      - "18083:8083"
+    depends_on:
+      - kafka
+    environment:
+      BOOTSTRAP_SERVERS: 'kafka-ticket:9092'
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs_ticket
+      OFFSET_STORAGE_TOPIC: connect_offsets_ticket
+      STATUS_STORAGE_TOPIC: connect_statuses_ticket
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+    networks:
+      - ticket-system-net
+
+  connect-configurator:
+    image: curlimages/curl:latest # 使用一个非常轻量的、只包含 curl 的镜像
+    container_name: connect-configurator-ticket
+    depends_on:
+      - connect # 依赖 connect 服务
+    networks:
+      - ticket-system-net
+    volumes:
+      - ./connect-conf:/config/ # 将我们的配置目录挂载到容器内
+    command: sh /config/configure-connect.sh # 容器启动后执行的命令
+    restart: on-failure # 如果配置失败，可以尝试重启
 
 # 定义数据卷
 volumes:
