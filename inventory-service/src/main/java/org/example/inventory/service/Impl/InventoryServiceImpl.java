@@ -1,7 +1,7 @@
 package org.example.inventory.service.Impl;
 
+import Constant.RedisKeyConstants;
 import jakarta.annotation.Resource;
-import org.example.inventory.common.RedisKeyConstants;
 import org.example.inventory.entity.StockDeductionLog;
 import org.example.inventory.mapper.StockDeductionMapper;
 import org.example.inventory.mapper.StockMapper;

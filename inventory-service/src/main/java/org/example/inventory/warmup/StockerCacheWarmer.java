@@ -1,7 +1,8 @@
 package org.example.inventory.warmup;
 
+import Constant.RedisKeyConstants;
 import jakarta.annotation.Resource;
-import org.example.inventory.common.RedisKeyConstants;
+
 import org.example.inventory.entity.Stock;
 import org.example.inventory.mapper.StockMapper;
 import org.slf4j.Logger;
