@@ -2,14 +2,20 @@ package org.example.inventory.service.Impl;
 
 import jakarta.annotation.Resource;
 import org.example.inventory.common.RedisKeyConstants;
+import org.example.inventory.entity.StockDeductionLog;
+import org.example.inventory.mapper.StockDeductionMapper;
 import org.example.inventory.mapper.StockMapper;
 import org.example.inventory.service.InventoryService;
 import org.example.inventory.warmup.StockerCacheWarmer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 public class InventoryServiceImpl implements InventoryService {
@@ -19,6 +25,11 @@ public class InventoryServiceImpl implements InventoryService {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
     @Autowired
     private StockMapper stockMapper;
+
+    @Autowired
+    private StockDeductionMapper stockDeductionLog;
+    @Autowired
+    private StockDeductionMapper stockDeductionMapper;
 
     @Override
     public boolean preDeductStockInCache(Long ticketItemId, Integer quantity) {
@@ -48,7 +59,19 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public boolean deductStockInDB(Long ticketItemId, Integer quantity) {
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deductStockInDB(String orderSn,Long ticketItemId, Integer quantity) {
+
+        try{
+            StockDeductionLog log = new StockDeductionLog(orderSn, LocalDateTime.now());
+            stockDeductionMapper.insert(log);
+        }
+        catch (DuplicateKeyException e){
+            log.warn("幂等性检查:库存扣减重复,orderSn:{}",orderSn);
+            return true;
+        }
+
+
         int affectedRow = stockMapper.deductStockInDB(ticketItemId, quantity);
 
         if(affectedRow > 0) {

@@ -68,14 +68,10 @@ public class OrderServiceImpl implements OrderService {
 
         try{
 
-
-
             String orderSerialNo = UUID.randomUUID().toString().replace("-", "");
 
-
-
             OrderCreationMessage message = new OrderCreationMessage(
-                    userId, // <-- 关键改动：设置用户ID
+                    userId,
                     request.getTicketItemId(),
                     request.getQuantity(),
                     orderSerialNo
@@ -121,7 +117,7 @@ public class OrderServiceImpl implements OrderService {
         try {
             // 1. 实际扣减数据库库存 (Feign 调用)
             // 这一步也需要幂等，或者支持重复调用无副作用
-            boolean dbDeductStatus = inventoryFeignClient.deductStockInDB(request.getTicketItemId(), request.getQuantity());
+            boolean dbDeductStatus = inventoryFeignClient.deductStockInDB(request.getOrderSerialNo(),request.getTicketItemId(), request.getQuantity());
 
             if (dbDeductStatus) {
                 log.info("数据库库存扣减成功，开始创建订单 TicketItemId: {}", request.getTicketItemId());
@@ -129,25 +125,18 @@ public class OrderServiceImpl implements OrderService {
                 int updatedRows = orderMapper.updateStatus(request.getOrderSerialNo(), 1);
                 if (updatedRows == 0) {
                     log.warn("Order not found or status already updated for OrderSN: {}", request.getOrderSerialNo());
-                    // 可能是一个重复消息，或者订单不存在，需要有相应的处理
+                    throw new RuntimeException("failed to update status for orderSn{}" + request.getOrderSerialNo());
                 }
+                log.info("Order {} confirmed", request.getOrderSerialNo());
 
             } else {
                 log.warn("数据库扣减失败，需要回补缓存  TicketItemId: {}", request.getTicketItemId());
                 inventoryFeignClient.rollbackStockInCache(request.getTicketItemId(), request.getQuantity());
-                // 考虑是否需要抛出异常以进行重试
+                throw new RuntimeException("Stock deduction failed for OrderSN: " + request.getOrderSerialNo());
             }
-
-
-
-            log.info("Order {} confirmed.", request.getOrderSerialNo());
         } catch (DuplicateKeyException e) {
-            // 捕获唯一键冲突异常
-            // 这不是一个错误！这是幂等性保证机制成功拦截了重复消息！
             log.warn("幂等性检查：订单已存在，忽略重复消息. OrderSN: {}", request.getOrderSerialNo());
-            // 什么都不做，方法正常结束，Kafka 会认为消息已成功消费
         }
-        // 其他所有 Exception 会因为 @Transactional 注解而导致事务回滚，
-        // 并且会冒泡到 KafkaListener，触发重试。
+
     }
 }

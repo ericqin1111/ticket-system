@@ -18,8 +18,8 @@ public class InventoryController {
     }
 
     @PostMapping("/inventory/deduct-db")
-    boolean deductStockInDB(@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity")Integer quantity){
-        return inventoryService.deductStockInDB(ticketItemId,quantity);
+    boolean deductStockInDB(@RequestParam("orderSn") String orderSn,@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity")Integer quantity){
+        return inventoryService.deductStockInDB(orderSn,ticketItemId,quantity);
     }
 
     @PostMapping("/inventory/rollback-cache")

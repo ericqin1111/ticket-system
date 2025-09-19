@@ -10,7 +10,7 @@ public interface InventoryFeignClient {
     boolean preDeductStock(@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity") Integer quantity);
 
     @PostMapping("/inventory/deduct-db")
-    boolean deductStockInDB(@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity")Integer quantity);
+    boolean deductStockInDB(@RequestParam("orderSn")String orderSn,@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity")Integer quantity);
 
     @PostMapping("/inventory/rollback-cache")
     void rollbackStockInCache(@RequestParam("ticketItemId")Long ticketItemId,@RequestParam("quantity")Integer quantity);

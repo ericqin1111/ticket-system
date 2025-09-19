@@ -12,7 +12,7 @@ public interface InventoryService {
      */
     boolean preDeductStockInCache(Long ticketItemId,Integer quantity);
 
-    boolean deductStockInDB(Long ticketItemId,Integer quantity);
+    boolean deductStockInDB(String OrderSn,Long ticketItemId,Integer quantity);
 
     void rollbackStockInCache(Long ticketItemId,Integer quantity);
 }
