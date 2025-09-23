@@ -3,6 +3,16 @@ server:
 spring:
   application:
     name: gateway-service
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 123456
+      database: 0
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/ticket_system?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
   cloud:
     nacos:
       discovery:
@@ -26,6 +36,20 @@ spring:
             - Path=/api/user/** # 匹配所有 /api/user/ 开头的请求
           filters:
             - StripPrefix=1 # 转发时去掉 /api
+
+        - id: queue_admin_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/admin/queue/**
+          filters:
+            - StripPrefix=1
+
+        - id: queue_route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/queue/**
+          filters:
+            - StripPrefix=1
 # JWT Configuration
 jwt:
   secret: "bXktc2VjcmV0LWtleS1mb3ItdGlja2V0LXN5c3RlbS1pcy1zby1zZWN1cmUtYW5kLWxvbmc="

@@ -15,8 +15,7 @@ public class QueueServiceImpl implements QueueService {
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
-    @Autowired
-    private RedisTemplate<Object, Object> redisTemplate;
+
 
 
     @Override
@@ -24,7 +23,7 @@ public class QueueServiceImpl implements QueueService {
         String queueKey=String.format(RedisKeyConstants.QUEUE_TICKET,ticketItemId);
         String userStr = String.valueOf(userId);
 
-        redisTemplate.opsForZSet().addIfAbsent(queueKey,userStr,System.nanoTime());
+        stringRedisTemplate.opsForZSet().addIfAbsent(queueKey,userStr,System.nanoTime());
         return checkStatus(userId,ticketItemId);
     }
 
