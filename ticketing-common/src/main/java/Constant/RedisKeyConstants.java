@@ -32,6 +32,8 @@ public final class RedisKeyConstants {
        */
     public static final String QUEUE_PASS="queue:ticket_item:%s:user:%s";
 
+
+
     /**
      *  抢购票集合
      *  数据结构 Set

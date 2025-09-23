@@ -24,13 +24,19 @@ public class QueueAdminController {
     public ResponseEntity<?> updateConfig(@RequestBody QueueConfigRequest queueConfigRequest){
         String configKey= String.format(RedisKeyConstants.QUEUE_CONFIG,queueConfigRequest.getTicketItemId());
 
+        String activeTicketKey=String.format(RedisKeyConstants.QUEUE_ACTIVE_TICKETS);
         Map<String,String> config=new HashMap<>();
 
         if(queueConfigRequest.getReleaseRate()!=null){
             config.put("release_rate",String.valueOf(queueConfigRequest.getReleaseRate()));
         }
-        if(queueConfigRequest.getIsActive()!=null){
-            config.put("is_active",queueConfigRequest.getIsActive()?"1":"0");
+        if(queueConfigRequest.getIsActive()!=null && queueConfigRequest.getIsActive()){
+            config.put("is_active","1");
+            stringRedisTemplate.opsForSet().add(activeTicketKey, String.valueOf(queueConfigRequest.getTicketItemId()));
+        }
+        else{
+            config.put("is_active","0");
+            stringRedisTemplate.opsForSet().remove(String.valueOf(queueConfigRequest.getTicketItemId()));
         }
 
         stringRedisTemplate.opsForHash().putAll(configKey,config);

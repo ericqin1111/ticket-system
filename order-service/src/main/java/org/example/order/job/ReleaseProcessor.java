@@ -33,32 +33,58 @@ public class ReleaseProcessor {
 
     @Scheduled(fixedRate = 1000)
     public void releaseUsers(){
-        Set<String> configKeys = stringRedisTemplate.keys(String.format(RedisKeyConstants.QUEUE_CONFIG,"*"));
 
-        if(configKeys.isEmpty()){
+        String activeTicket= RedisKeyConstants.QUEUE_ACTIVE_TICKETS;
+        Set<String> activeTicketItemIds = stringRedisTemplate.opsForSet().members(activeTicket);
+
+        if (activeTicketItemIds != null && activeTicketItemIds.isEmpty()) {
             return;
         }
 
-        for (String configKey : configKeys) {
-            Map<Object, Object> config = stringRedisTemplate.opsForHash().entries(configKey);
+        for(String ticketItemIdStr:activeTicketItemIds){
+            long ticketItemId = Long.parseLong(ticketItemIdStr);
+            String configKey=String.format(RedisKeyConstants.QUEUE_CONFIG,ticketItemId);
 
-            String isActive=(String) config.get("is_active");
-            String releaseRateStr=(String) config.get("release_rate");
+            String releaseRateStr=(String) stringRedisTemplate.opsForHash().get(configKey,"release_rate");
 
-            if("1".equals(isActive) && releaseRateStr!=null){
+            if(releaseRateStr!=null){
                 try{
                     long releaseRate = Long.parseLong(releaseRateStr);
-                    if(releaseRate<=0) continue;
-
-                    long ticketItemId = Long.parseLong(configKey.split(":")[2]);
-
-                    processQueueForItem(ticketItemId,releaseRate);
+                    if(releaseRate > 0){
+                        processQueueForItem(ticketItemId,releaseRate);
+                    }
                 }
                 catch (NumberFormatException e){
-                    logger.error("无效放行速率release_rate{}",releaseRateStr,e);
+                    logger.error("无效放行速率:{},ticketItemId:{}",releaseRateStr,ticketItemIdStr,e);
                 }
             }
         }
+
+        //       Set<String> configKeys = stringRedisTemplate.keys(String.format(RedisKeyConstants.QUEUE_CONFIG,"*"));
+
+        //        if(configKeys.isEmpty()){
+//            return;
+//        }
+//        for (String configKey : configKeys) {
+//            Map<Object, Object> config = stringRedisTemplate.opsForHash().entries(configKey);
+//
+//            String isActive=(String) config.get("is_active");
+//            String releaseRateStr=(String) config.get("release_rate");
+//
+//            if("1".equals(isActive) && releaseRateStr!=null){
+//                try{
+//                    long releaseRate = Long.parseLong(releaseRateStr);
+//                    if(releaseRate<=0) continue;
+//
+//                    long ticketItemId = Long.parseLong(configKey.split(":")[2]);
+//
+//                    processQueueForItem(ticketItemId,releaseRate);
+//                }
+//                catch (NumberFormatException e){
+//                    logger.error("无效放行速率release_rate{}",releaseRateStr,e);
+//                }
+//            }
+//        }
 
 
 
