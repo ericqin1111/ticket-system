@@ -1,6 +1,7 @@
 package org.example.ticket.service.impl;
 
 import Constant.RedisKeyConstants;
+import com.alicp.jetcache.anno.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,48 +57,30 @@ public class TicketServiceImpl implements TicketService {
     private static final String KAFKA_TICKET_UPDATE_TOPIC = "ticket_update_topic";
 
     @Override
-    @Cacheable(value = CACHE_NAME_PRICE_TIER,key = "#priceTierId")
+    @Cached(name = "priceTierCache:",
+    key = "#priceTierId",
+    cacheType = CacheType.BOTH,
+    expire = 1 , timeUnit = TimeUnit.HOURS,
+    cacheNullValue = true)
+    @CachePenetrationProtect(timeout = 1000)
     public PriceTierDetailDTO getPriceTierDetails(Long priceTierId) {
-        log.info("[L1缓存]:L1中无{}的记录",priceTierId);
 
-        String redisKey = String.format(RedisKeyConstants.REDIS_PRICE_TIER_KEY,priceTierId);
-        String json = stringRedisTemplate.opsForValue().get(redisKey);
-
-        if(StringUtils.hasText(json)){
-            log.info("[L2 CACHE]存在键 key:{}",redisKey);
-            try{
-                return objectMapper.readValue(json,PriceTierDetailDTO.class);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("在序列化Redis priceTier失败",e);
-            }
-        }
-
-        log.warn("[L1 CACHE] [L2 CACHE]均无记录,准备从数据库中查询priceTierId:{}",priceTierId);
+        log.warn("JetCache未命中,准备从数据库查询priceTierId:{}", priceTierId);
         PriceTier priceTier=priceTierMapper.selectById(priceTierId);
         if(priceTier==null){
-            log.warn("数据库中未能查询到priceTier Id:{}",priceTierId);
+            log.warn("数据库未能查询到priceTier Id:{}", priceTierId);
             return null;
         }
 
         Event event = eventMapper.selectById(priceTier.getEventId());
-        Ticket ticket = (event != null)? ticketMapper.selectById(event.getTicketId()):null;
+        Ticket ticket=(event!=null)?ticketMapper.selectById(event.getTicketId()):null;
 
-        PriceTierDetailDTO dto = buildPriceTierDetailDTO(priceTier,event,ticket);
-
-        try{
-            String dtoJson = objectMapper.writeValueAsString(dto);
-            long expireTime = 60L + (long)(Math.random()*30);
-            stringRedisTemplate.opsForValue().set(redisKey,dtoJson,expireTime, TimeUnit.MINUTES);
-            log.info("[L2 CACHE] 写入key:{}",redisKey);
-        } catch (JsonProcessingException e) {
-            log.error("序列化priceTierDto失败",e);
-        }
-
-        return dto;
+        return buildPriceTierDetailDTO(priceTier,event,ticket);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheUpdate(name = "priceTierCache:",key = "#dto.tierId",value = "#dto")
     public void updatePriceTier(PriceTierDetailDTO dto) {
         if(dto.getTierId()==null){
             log.error("更新失败:tierId 为 null");
@@ -114,16 +97,14 @@ public class TicketServiceImpl implements TicketService {
         priceTierMapper.updateById(priceTierToUpdate);
 
         log.info("Tier{}数据更新成功，向kafka发送清空缓存的消息",dto.getTierId());
-        kafkaTemplate.send(KAFKA_TICKET_UPDATE_TOPIC,String.valueOf(dto.getTierId()));
+//        kafkaTemplate.send(KAFKA_TICKET_UPDATE_TOPIC,String.valueOf(dto.getTierId()));
     }
 
     @Override
-    @CacheEvict(value = CACHE_NAME_PRICE_TIER,key = "#priceTierId")
+    @CacheInvalidate(name = "priceTierCache:" ,key="#priceTierId")
     public void evictPriceTierCacher(Long priceTierId) {
-        String redisKey = String.format(RedisKeyConstants.REDIS_PRICE_TIER_KEY,priceTierId);
-        Boolean deleted = stringRedisTemplate.delete(redisKey);
-        log.info("[CACHE EVICTION] 从L1缓存中删除记录 key:{},L2缓存中删除 key:{}, success:{}",priceTierId,redisKey,deleted);
 
+        log.info("Jetcache从缓存中删除 key{}:",priceTierId);
     }
 
     private PriceTierDetailDTO buildPriceTierDetailDTO(PriceTier priceTier, Event event, Ticket ticket) {
@@ -142,7 +123,6 @@ public class TicketServiceImpl implements TicketService {
             dto.setCity(event.getCity());
             dto.setTicketId(event.getTicketId());
             if (ticket != null) {
-                // Ticket info
                 dto.setTicketName(ticket.getTitle());
                 dto.setDescription(ticket.getDescription());
             }

@@ -1,0 +1,30 @@
+# src/test/resources/application.yml
+spring:
+  # 在测试中禁用kafka的自动配置，除非你也想用嵌入式Kafka
+  kafka:
+    bootstrap-servers: OFF
+  # 让JetCache连接到我们的测试Redis
+jetcache:
+  statIntervalMinutes: 1
+  areaInCacheName: false
+  local:
+    default:
+      type: caffeine
+      keyConvertor: fastjson2
+      expireAfterWrite: 10s # 测试时用较短的过期时间
+      maximumSize: 100
+  remote:
+    default:
+      type: redis
+      keyConvertor: fastjson2
+      valueEncoder: java
+      valueDecoder: java
+      expireAfterWrite: 20s # 测试时用较短的过期时间
+      host: 127.0.0.1
+      port: 63790 #  <-- 关键：指向嵌入式Redis的端口
+      # password: 123456 # 嵌入式Redis默认没有密码
+
+      poolConfig:
+        minIdle: 5
+        maxIdle: 10
+        maxTotal: 20
