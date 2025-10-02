@@ -1,0 +1,42 @@
+server:
+  port: 8001
+spring:
+  application:
+    name: ticket-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  # --- 缓存配置 ---
+  cache:
+    type: caffeine # 显式指定使用Caffeine作为缓存提供者
+    caffeine:
+      spec: initialCapacity=128,maximumSize=1024,expireAfterWrite=10m # 配置Caffeine参数
+  # --- Redis配置 ---
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 123456
+      database: 0
+  # --- Kafka配置 ---
+  kafka:
+    bootstrap-servers: localhost:29092
+    consumer:
+      group-id: ticket_update_group # 定义消费者组
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  # --- 数据库配置 ---
+  datasource:
+    url: jdbc:mysql://localhost:3306/ticket_system?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true

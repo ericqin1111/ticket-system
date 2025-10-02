@@ -3,9 +3,14 @@ package Constant;
 public final class RedisKeyConstants {
     RedisKeyConstants() {}
 
+    public static String build(String... part){
+        return String.join(":", part);
+    }
     /**
      * 命名：{业务}:{表名}:
      */
+
+    /* ================ORDER-SERVICE================
 
     /**
         * 库存
@@ -53,8 +58,6 @@ public final class RedisKeyConstants {
 
 
 
-
-
     /**
      * 用户排队状态 Key
      * 格式: queue_user_status:{ticketItemId}:{userId}
@@ -71,5 +74,13 @@ public final class RedisKeyConstants {
      * 用途: 统计某个票务商品排队相关的数据指标
      */
     public static final String QUEUE_STATISTIC="status:ticket_item:%s";
+
+
+
+
+
+    /* ==============TICKET-SERVICE================ */
+
+    public static final String REDIS_PRICE_TIER_KEY="ticket:tier:%s";
 }
 

@@ -48,6 +48,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
+
     @Override
     public String createOrderRequest(Long userId,CreateOrderRequest request) {
 
@@ -96,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+
     public void createOrderInDB(OrderCreationMessage request){
         Order order=new Order();
 
@@ -139,4 +141,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
     }
+
+    @Override
+    public boolean checkConsistency(Long ticketItemId, CreateOrderRequest request) {
+        return ticketItemId==request.getTicketItemId();
+    }
+
+
 }

@@ -1,4 +1,4 @@
-package org.example.ticket.config;
+package org.example.gateway.config;
 
 
 import org.springframework.context.annotation.Bean;

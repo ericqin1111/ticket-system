@@ -1,12 +1,12 @@
-package org.example.ticket.filter;
+package org.example.gateway.filter;
 
 
 
 import jakarta.annotation.Resource;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.ticket.config.AuthProperties;
-import org.example.ticket.util.JwtUtil;
+import org.example.gateway.config.AuthProperties;
+import org.example.gateway.util.JwtUtil;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;

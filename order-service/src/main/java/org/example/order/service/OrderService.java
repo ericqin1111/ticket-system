@@ -11,4 +11,6 @@ public interface OrderService{
     public void createOrderInDB(OrderCreationMessage request);
 
     public void processOrderCreation(OrderCreationMessage request);
+
+    public boolean checkConsistency(Long ticketItemId,CreateOrderRequest request);
 }

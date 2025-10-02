@@ -1,4 +1,4 @@
-package org.example.ticket.util;
+package org.example.gateway.util;
 
 
 import io.jsonwebtoken.Claims;

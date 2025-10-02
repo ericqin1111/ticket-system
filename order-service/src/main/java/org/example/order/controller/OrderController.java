@@ -29,20 +29,23 @@ public class OrderController {
     private final Logger log = LoggerFactory.getLogger(OrderController.class);
 
     @PostMapping("/create")
-    public ResponseEntity<Map<String,String>> createOrder(@RequestHeader("X-User-ID") Long userId,@RequestBody CreateOrderRequest request) {
+    public ResponseEntity<Map<String,String>> createOrder(@RequestHeader("X-User-ID") Long userId,@RequestBody CreateOrderRequest request,@RequestHeader("X-Ticket-Item-Id")Long ticketItemId) {
 
         log.info("Received order creation request from User ID: {}", userId);
 
+        if(orderService.checkConsistency(ticketItemId,request)){
+            String orderSn = orderService.createOrderRequest(userId,request);
 
-
-        String orderSn = orderService.createOrderRequest(userId,request);
-
-        if (orderSn != null) {
-            // 返回成功，告知前端已进入排队
-            return ResponseEntity.ok(Map.of("message", "Request submitted, processing in queue.","orderSn",orderSn));
-        } else {
-            // 返回失败，告知前端库存不足
-            return ResponseEntity.status(400).body(Map.of("message", "Failed to create order, insufficient stock."));
+            if (orderSn != null) {
+                // 返回成功，告知前端已进入排队
+                return ResponseEntity.ok(Map.of("message", "Request submitted, processing in queue.","orderSn",orderSn));
+            } else {
+                // 返回失败，告知前端库存不足
+                return ResponseEntity.status(400).body(Map.of("message", "Failed to create order, insufficient stock."));
+            }
+        }
+        else{
+            return ResponseEntity.status(400).body(Map.of("message", "请求头与body内容不符合"));
         }
     }
 

@@ -1,7 +1,7 @@
-package org.example.ticket.queue.strategy.impl;
+package org.example.gateway.queue.strategy.impl;
 
 import Constant.RedisKeyConstants;
-import org.example.ticket.queue.strategy.QueueStrategy;
+import org.example.gateway.queue.strategy.QueueStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,6 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
-import org.springframework.util.PathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -61,9 +60,7 @@ public class OrderCreateQueueStrategy implements QueueStrategy {
         /**
          * 检查是否需要排队
          */
-
         String configKey= String.format(RedisKeyConstants.QUEUE_CONFIG,ticketItemId);
-
         String isActive= (String) stringRedisTemplate.opsForHash().get(configKey,"is_active");
 
         if(! "1".equals(isActive)){

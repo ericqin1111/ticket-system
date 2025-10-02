@@ -1,4 +1,4 @@
-package org.example.ticket.queue.strategy;
+package org.example.gateway.queue.strategy;
 
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.web.server.ServerWebExchange;
