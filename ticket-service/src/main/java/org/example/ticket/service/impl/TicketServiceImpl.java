@@ -13,6 +13,9 @@ import org.example.ticket.mapper.EventMapper;
 import org.example.ticket.mapper.PriceTierMapper;
 import org.example.ticket.mapper.TicketMapper;
 import org.example.ticket.service.TicketService;
+import org.example.ticket.util.BloomFIlterInitializer;
+import org.redisson.api.RBloomFilter;
+import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,16 +41,21 @@ public class TicketServiceImpl implements TicketService {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    private final String PRICE_TIER_BLOOM_FILTER=BloomFIlterInitializer.PRICE_TIER_BLOOM_FILTER;
+
     private final Logger log;
     private final ObjectMapper objectMapper;
 
+    private final RedissonClient redissonClient;
+
     @Autowired
-    public TicketServiceImpl(TicketMapper ticketMapper, StringRedisTemplate stringRedisTemplate, EventMapper eventMapper, PriceTierMapper priceTierMapper, KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
+    public TicketServiceImpl(TicketMapper ticketMapper, StringRedisTemplate stringRedisTemplate, EventMapper eventMapper, PriceTierMapper priceTierMapper, KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper, RedissonClient redissonClient) {
         this.ticketMapper = ticketMapper;
         this.stringRedisTemplate = stringRedisTemplate;
         this.eventMapper = eventMapper;
         this.priceTierMapper = priceTierMapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.redissonClient = redissonClient;
         this.log = LoggerFactory.getLogger(TicketServiceImpl.class);
         this.objectMapper = objectMapper;
     }
@@ -64,6 +72,13 @@ public class TicketServiceImpl implements TicketService {
     cacheNullValue = true)
     @CachePenetrationProtect(timeout = 1000)
     public PriceTierDetailDTO getPriceTierDetails(Long priceTierId) {
+
+        RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(PRICE_TIER_BLOOM_FILTER);
+        if(!bloomFilter.contains(priceTierId)){
+            log.warn("[BLOOM FILTER] 拒绝tierId为{}的请求",priceTierId);
+            return null;
+        }
+        log.info("[BLOOM FILTER] 放行tierId为{}的请求",priceTierId);
 
         log.warn("JetCache未命中,准备从数据库查询priceTierId:{}", priceTierId);
         PriceTier priceTier=priceTierMapper.selectById(priceTierId);

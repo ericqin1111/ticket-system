@@ -6,7 +6,7 @@ import org.example.ticket.service.TicketService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/tiers") // 路径修改为/tiers，更符合RESTful语义
+@RequestMapping("/ticket/tier") // 路径修改为/tiers，更符合RESTful语义
 public class TicketController {
 
     @Resource

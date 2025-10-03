@@ -60,8 +60,9 @@ jetcache:
         minIdle: 5
         maxIdle: 20
         maxTotal: 50
-#  caches:
-#    priceTierCache: # 定义一个名为 "priceTierCache" 的缓存实例
-#      cacheType: BOTH # ★★★ 最关键的配置：指定这是一个二级缓存（本地+远程）
-#      localExpire: 5m   # 单独为此缓存实例指定L1的过期时间为5分钟（覆盖local.default）
-#      expire: 60m       # 单独为此缓存实例指定L2的过期时间为60分钟（覆盖remote.default）
+redisson:
+  single-server-config:
+    address: "redis://127.0.0.1:6379"
+    # 如果有密码
+    password: 123456
+    database: 0

@@ -50,6 +50,13 @@ spring:
             - Path=/api/queue/**
           filters:
             - StripPrefix=1
+
+        - id: ticket_route
+          uri: lb://ticket-service
+          predicates:
+            - Path=/api/ticket/**
+          filters:
+            - StripPrefix=1
 # JWT Configuration
 jwt:
   secret: "bXktc2VjcmV0LWtleS1mb3ItdGlja2V0LXN5c3RlbS1pcy1zby1zZWN1cmUtYW5kLWxvbmc="

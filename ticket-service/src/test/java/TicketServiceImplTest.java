@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RedissonClient;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -50,6 +51,9 @@ class TicketServiceImplTest {
     // 为了方便，在测试类中也初始化一个ObjectMapper
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @InjectMocks
+    private RedissonClient redissonClient;
+
     // 在每个测试方法执行前，重新设置TicketServiceImpl的内部依赖（可选，但更规范）
     @BeforeEach
     void setUp() {
@@ -62,7 +66,8 @@ class TicketServiceImplTest {
                 eventMapper,
                 priceTierMapper,
                 kafkaTemplate,
-                objectMapper
+                objectMapper,
+                redissonClient
         );
     }
 
