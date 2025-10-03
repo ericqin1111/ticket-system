@@ -77,3 +77,8 @@ logging:
     org.springframework.web.reactive: DEBUG
     # 查看底层 Netty 服务器的日志
     reactor.netty: DEBUG
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # 1.0 表示100%采样，生产环境可适当调低，如0.1

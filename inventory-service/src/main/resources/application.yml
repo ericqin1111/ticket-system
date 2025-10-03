@@ -17,3 +17,8 @@ spring:
       port: 6379
       password: 123456
       database: 0
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # 1.0 表示100%采样，生产环境可适当调低，如0.1

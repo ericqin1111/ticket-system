@@ -12,6 +12,7 @@ import org.example.order.feign.InventoryFeignClient;
 import org.example.order.mapper.OrderMapper;
 import org.example.order.mapper.OutboxMapper;
 import org.example.order.service.OrderService;
+import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Resource
     RedisTemplate redisTemplate;
+
+    @Autowired
+    private RedissonClient redissonClient;
 
     private final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 

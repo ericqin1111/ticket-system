@@ -117,6 +117,32 @@ services:
     networks:
       - ticket-system-net
 
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - ticket-system-net
+
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - ./promtail:/etc/promtail
+      # 关键：将你本地的日志目录挂载到 Promtail 容器中
+      # 这里假设你的所有微服务模块都在 ticketing-sys-parent 下
+      # 并且它们的日志都输出到各自模块的 logs 目录下
+      - ./logs:/logs
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - ticket-system-net
+
 
   connect:
     image: debezium/connect:2.1

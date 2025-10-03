@@ -25,3 +25,9 @@ jwt:
   secret: "bXktc2VjcmV0LWtleS1mb3ItdGlja2V0LXN5c3RlbS1pcy1zby1zZWN1cmUtYW5kLWxvbmc="
   # 过期时间 (毫秒): 86400000ms = 24 hours
   expiration: 86400000
+
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0 # 1.0 表示100%采样，生产环境可适当调低，如0.1
