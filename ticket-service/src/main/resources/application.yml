@@ -72,3 +72,21 @@ management:
   tracing:
     sampling:
       probability: 1.0 # 1.0 表示100%采样，生产环境可适当调低，如0.1
+
+# 缓存配置（多级缓存）
+cache:
+  key:
+    tier-version: 1
+  local:
+    enabled: true
+    maximum-size: 50000
+    expire-after-write-ms: 1200000   # 20 分钟
+    negative-ttl-ms: 30000
+  redis:
+    ttl-ms: 3600000                 # 1 小时
+    negative-ttl-ms: 30000
+    hot-key-ttl-ms: 10800000        # 3 小时
+    compress: false
+  breaker:
+    degrade-on-error: true
+    use-redis-lock-for-penalty: false
