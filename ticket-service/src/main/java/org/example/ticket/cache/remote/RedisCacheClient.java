@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ticket.cache.model.CacheResult;
+import org.example.ticket.cache.remote.RedisMetrics;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -16,14 +17,18 @@ public class RedisCacheClient {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final RedisMetrics redisMetrics;
 
-    public RedisCacheClient(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper) {
+    public RedisCacheClient(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper, RedisMetrics redisMetrics) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
+        this.redisMetrics = redisMetrics;
     }
 
     public <T> CacheResult<T> get(String key, Class<T> type) {
+        var sample = redisMetrics.start();
         String raw = stringRedisTemplate.opsForValue().get(key);
+        redisMetrics.stopAndRecord(sample, key);
         if (raw == null) {
             return CacheResult.miss();
         }

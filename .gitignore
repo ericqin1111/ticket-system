@@ -6,6 +6,8 @@ target/
 
 logs/
 
+docs/
+
 
 ### STS ###
 .apt_generated

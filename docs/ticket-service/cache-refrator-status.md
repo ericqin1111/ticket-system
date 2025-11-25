@@ -7,8 +7,10 @@
 - 目录结构与包名与 docs 中的 `cache-framework.md` 对齐（config/core/local/remote/key/model）。
 - 接入业务：`TicketServiceImpl.getPriceTierDetails` 采用 `TieredCacheService` + BloomFilter 回源；`updatePriceTier`/`evictPriceTierCacher` 调用缓存失效；移除 JetCache 注解链路。
 - 新增缓存配置段 `cache.*` 至 `ticket-service` `application.yml`（TTL、负缓存、本地开关、版本号、降级开关）。
+- 事件广播消费者：`TicketUpdateConsumer` 改为使用缓存模板失效，去除 JetCache 依赖。
+- 指标埋点：`TieredCacheService` 集成 Micrometer 统计命中（local/redis）、miss、DB 回源耗时，慢回源打印告警；`RedisMetrics` 统计 Redis GET 耗时及慢查询计数；新增 `logback-spring.xml` 便于日志控制。
+- 事件同步：`updatePriceTier` 触发 Kafka `ticket_update_topic` 广播，消费者统一用缓存模板失效，完成跨实例同步。
 
 ## 待办
-- `TicketUpdateConsumer` 接入新的失效逻辑，移除 JetCache 残留，确认事件广播路径（Kafka/Spring Event）。
-- 增补 Micrometer 指标与日志埋点（命中率、回源耗时、失败次数），慢查询告警。
+- 补充缓存失败计数与链路追踪 tag，完善日志格式字段。
 - 根据 `cache-refractor.md` 收尾：结合布隆过滤器/Negative Cache，完善事件广播同步本地缓存失效；视情况加入 Redisson 锁热点兜底。

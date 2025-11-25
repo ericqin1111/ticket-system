@@ -18,6 +18,7 @@ import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,8 @@ public class TicketServiceImpl implements TicketService {
     private final CacheTemplate cacheTemplate;
     private final PriceTierCacheKeyBuilder priceTierCacheKeyBuilder;
     private final CacheProperties cacheProperties;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private static final String CACHE_INVALIDATE_TOPIC = "ticket_update_topic";
 
     @Autowired
     public TicketServiceImpl(
@@ -47,7 +50,8 @@ public class TicketServiceImpl implements TicketService {
             RedissonClient redissonClient,
             CacheTemplate cacheTemplate,
             PriceTierCacheKeyBuilder priceTierCacheKeyBuilder,
-            CacheProperties cacheProperties
+            CacheProperties cacheProperties,
+            KafkaTemplate<String, String> kafkaTemplate
     ) {
         this.ticketMapper = ticketMapper;
         this.eventMapper = eventMapper;
@@ -57,6 +61,7 @@ public class TicketServiceImpl implements TicketService {
         this.cacheTemplate = cacheTemplate;
         this.priceTierCacheKeyBuilder = priceTierCacheKeyBuilder;
         this.cacheProperties = cacheProperties;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Override
@@ -103,8 +108,9 @@ public class TicketServiceImpl implements TicketService {
 
         log.info("Tier{}数据更新成功，开始失效缓存",dto.getTierId());
         cacheTemplate.invalidate(priceTierCacheKeyBuilder.build(dto.getTierId()));
-        // 预留: 发送失效事件广播
-//        kafkaTemplate.send(KAFKA_TICKET_UPDATE_TOPIC,String.valueOf(dto.getTierId()));
+        // 发送失效事件广播
+        kafkaTemplate.send(CACHE_INVALIDATE_TOPIC, String.valueOf(dto.getTierId()));
+        log.info("已广播缓存失效事件，topic={}, tierId={}", CACHE_INVALIDATE_TOPIC, dto.getTierId());
     }
 
     @Override
