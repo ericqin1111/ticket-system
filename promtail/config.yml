@@ -1,5 +1,6 @@
 server:
   http_listen_port: 9080
+  http_listen_address: 0.0.0.0
   grpc_listen_port: 0
 
 positions:
@@ -7,6 +8,8 @@ positions:
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
+    batchsize: 1048576      # 单次推送的最大字节数（1MB）
+    batchwait: 5s           # 每5秒批量推送一次
 
 scrape_configs:
   - job_name: ticketing-system
@@ -16,11 +19,13 @@ scrape_configs:
         labels:
           # 这个 job 标签会附加到所有从此配置采集的日志中
           job: ticketing-services
+          service: "dummy"
+          logger_name: "dummy"
           __path__: /logs/*.log # 匹配所有服务下的 .log 文件
 
     pipeline_stages:
       # 从日志的文件路径中提取服务名作为 'service' 标签
-      # 例如, 从 /logs/user-service/user-service.log 提取 'user-service'
+      # 例如, 从 /logs/user-service.log 提取 'user-service'
       - regex:
           expression: ".*/(?P<service>[^.]+)\\.log$"
           source: filename
@@ -30,10 +35,26 @@ scrape_configs:
           expressions:
             # 将JSON中的字段提取出来，可以在Grafana中直接使用
             level: level
+            logger_name: logger_name
             traceId: traceId # 提取 traceId
+            message: message
 
       # 使用提取出的字段设置 Loki 的标签
       # 标签 (Labels) 是 Loki 高效查询的关键！只为需要频繁过滤的字段设置标签。
       - labels:
           service:
           level:
+          logger_name:
+
+      - match:
+          selector:
+            '{logger_name="org.example.order.controller.OrderController"}'
+          stages:
+            - metrics:
+                  order_create_requests_total:
+                    type: counter
+                    description: "Total order creation requests"
+                    source: ""
+                    config:
+                      match_all: true
+                      action: inc

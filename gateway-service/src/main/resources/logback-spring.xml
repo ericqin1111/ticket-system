@@ -24,10 +24,11 @@
                 <loggerName/>
                 <message/>
                 <stackTrace/>
-                <mdc>
-                    <includeMdcKeyName>traceId</includeMdcKeyName>
-                    <includeMdcKeyName>spanId</includeMdcKeyName>
-                </mdc>
+<!--                <mdc>-->
+<!--                    <includeMdcKeyName>traceId</includeMdcKeyName>-->
+<!--                    <includeMdcKeyName>spanId</includeMdcKeyName>-->
+<!--                </mdc>-->
+                <tracing/>
                 <globalCustomFields>
                     {"app":"${springAppName}"}
                 </globalCustomFields>
