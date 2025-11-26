@@ -10,7 +10,8 @@
 - 事件广播消费者：`TicketUpdateConsumer` 改为使用缓存模板失效，去除 JetCache 依赖。
 - 指标埋点：`TieredCacheService` 集成 Micrometer 统计命中（local/redis）、miss、DB 回源耗时，慢回源打印告警；`RedisMetrics` 统计 Redis GET 耗时及慢查询计数；新增 `logback-spring.xml` 便于日志控制。
 - 事件同步：`updatePriceTier` 触发 Kafka `ticket_update_topic` 广播，消费者统一用缓存模板失效，完成跨实例同步。
+- 失败计数与 trace tag：回源异常计数 `cache.load.fail.total`，日志包含 `cache.key` trace 信息。
 
 ## 待办
-- 补充缓存失败计数与链路追踪 tag，完善日志格式字段。
+- 完善链路追踪 tag/日志格式字段；必要时加入 Redisson 锁热点兜底。
 - 根据 `cache-refractor.md` 收尾：结合布隆过滤器/Negative Cache，完善事件广播同步本地缓存失效；视情况加入 Redisson 锁热点兜底。

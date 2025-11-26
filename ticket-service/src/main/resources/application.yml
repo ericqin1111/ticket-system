@@ -1,5 +1,5 @@
 server:
-  port: 8001
+  port: 8121
 spring:
   application:
     name: ticket-service
@@ -34,32 +34,6 @@ mybatis-plus:
   mapper-locations: classpath:/mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-jetcache:
-  # 打印缓存访问统计信息的时间间隔，0表示关闭。开发时可设为60秒，便于观察。
-  statIntervalMinutes: 15
-  # 缓存区域（Area）默认会作为Key的前缀，关闭它可以让Redis中的Key更简洁。
-  areaInCacheName: false
-  local:
-    default:
-      type: caffeine # 指定L1缓存类型为Caffeine
-      keyConvertor: fastjson2 # Key的序列化方式
-      expireAfterWrite: 10m # L1的默认过期时间：写入后10分钟
-      maximumSize: 5000     # L1的最大容量：5000个条目，防止内存溢出
-  # 定义远程缓存（L2）的通用规范
-  remote:
-    default:
-      type: redis # 指定L2缓存类型为Redis
-      keyConvertor: fastjson2 # Key的序列化方式
-      valueEncoder: java # Value的编码器
-      valueDecoder: java # Value的解码器
-      expireAfterWrite: 60m # L2的默认过期时间：写入后60分钟
-      host: 127.0.0.1
-      port: 6379
-      password: 123456
-      poolConfig:
-        minIdle: 5
-        maxIdle: 20
-        maxTotal: 50
 redisson:
   single-server-config:
     address: "redis://127.0.0.1:6379"
@@ -69,6 +43,17 @@ redisson:
 
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - prometheus
+          - metrics
+  endpoint:
+    prometheus:
+      enabled: true
   tracing:
     sampling:
       probability: 1.0 # 1.0 表示100%采样，生产环境可适当调低，如0.1

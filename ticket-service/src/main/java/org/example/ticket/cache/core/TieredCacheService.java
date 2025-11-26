@@ -9,6 +9,7 @@ import org.example.ticket.cache.model.CacheOptions;
 import org.example.ticket.cache.model.CacheResult;
 import org.example.ticket.cache.remote.RedisCacheClient;
 import org.example.ticket.cache.remote.RedisMetrics;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -53,19 +54,19 @@ public class TieredCacheService implements CacheTemplate {
         // L1
         CacheResult<T> localHit = localCache.getIfPresent(key, type);
         if (localHit.isHit()) {
-            meterRegistry.counter("cache.hit.total", "layer", CacheLayer.LOCAL.name()).increment();
+            meterRegistry.counter("cache.hit", "layer", CacheLayer.LOCAL.name()).increment();
             return localHit.getValue();
         }
 
         // L2
         CacheResult<T> redisHit = redisCache.get(key, type);
         if (redisHit.isHit()) {
-            meterRegistry.counter("cache.hit.total", "layer", CacheLayer.REDIS.name()).increment();
+            meterRegistry.counter("cache.hit", "layer", CacheLayer.REDIS.name()).increment();
             T val = redisHit.getValue();
             localCache.put(key, val);
             return val;
         }
-        meterRegistry.counter("cache.miss.total", "layer", "both").increment();
+        meterRegistry.counter("cache.miss", "layer", "both").increment();
 
         Object lock = locks.computeIfAbsent(key, k -> new Object());
         synchronized (lock) {
@@ -73,12 +74,12 @@ public class TieredCacheService implements CacheTemplate {
                 // double check after acquiring lock
                 CacheResult<T> secondLocalHit = localCache.getIfPresent(key, type);
                 if (secondLocalHit.isHit()) {
-                    meterRegistry.counter("cache.hit.total", "layer", CacheLayer.LOCAL.name()).increment();
+                    meterRegistry.counter("cache.hit", "layer", CacheLayer.LOCAL.name()).increment();
                     return secondLocalHit.getValue();
                 }
                 CacheResult<T> secondRedisHit = redisCache.get(key, type);
                 if (secondRedisHit.isHit()) {
-                    meterRegistry.counter("cache.hit.total", "layer", CacheLayer.REDIS.name()).increment();
+                    meterRegistry.counter("cache.hit", "layer", CacheLayer.REDIS.name()).increment();
                     T val = secondRedisHit.getValue();
                     localCache.put(key, val);
                     return val;
@@ -100,10 +101,14 @@ public class TieredCacheService implements CacheTemplate {
                 localCache.put(key, loaded);
                 return loaded;
             } catch (Exception ex) {
+                meterRegistry.counter("cache.load.fail").increment();
+                MDC.put("cache.key", key);
                 log.error("Cache load failed for key {}", key, ex);
                 if (opts.isAllowDegrade()) {
+                    MDC.remove("cache.key");
                     return null;
                 }
+                MDC.remove("cache.key");
                 throw new RuntimeException(ex);
             } finally {
                 locks.remove(key);
