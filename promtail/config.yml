@@ -38,6 +38,7 @@ scrape_configs:
             logger_name: logger_name
             traceId: traceId # 提取 traceId
             message: message
+            tmp_cache_layer: "'cache.layer'"
 
       # 使用提取出的字段设置 Loki 的标签
       # 标签 (Labels) 是 Loki 高效查询的关键！只为需要频繁过滤的字段设置标签。
@@ -45,6 +46,7 @@ scrape_configs:
           service:
           level:
           logger_name:
+          cache_layer: tmp_cache_layer
 
       - match:
           selector:

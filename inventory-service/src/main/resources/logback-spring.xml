@@ -2,7 +2,7 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="default-app"/>
+    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="inventory-service"/>
 
     <property name="LOG_PATH" value="logs"/>
 
@@ -24,6 +24,7 @@
                 <loggerName/>
                 <message/>
                 <stackTrace/>
+                <tracing/>
                 <mdc>
                     <includeMdcKeyName>traceId</includeMdcKeyName>
                     <includeMdcKeyName>spanId</includeMdcKeyName>

@@ -2,7 +2,7 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="default-app"/>
+    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="gateway-service"/>
 
     <property name="LOG_PATH" value="logs"/>
 
@@ -24,10 +24,10 @@
                 <loggerName/>
                 <message/>
                 <stackTrace/>
-<!--                <mdc>-->
-<!--                    <includeMdcKeyName>traceId</includeMdcKeyName>-->
-<!--                    <includeMdcKeyName>spanId</includeMdcKeyName>-->
-<!--                </mdc>-->
+                <mdc>
+                    <includeMdcKeyName>traceId</includeMdcKeyName>
+                    <includeMdcKeyName>spanId</includeMdcKeyName>
+                </mdc>
                 <tracing/>
                 <globalCustomFields>
                     {"app":"${springAppName}"}

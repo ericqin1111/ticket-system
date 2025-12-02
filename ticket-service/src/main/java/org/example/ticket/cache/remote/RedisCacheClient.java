@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.example.ticket.cache.model.CacheResult;
 import org.example.ticket.cache.remote.RedisMetrics;
+import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -38,7 +39,9 @@ public class RedisCacheClient {
         try {
             return CacheResult.hit(objectMapper.readValue(raw, type));
         } catch (JsonProcessingException e) {
+            MDC.put("cache.layer", "REDIS");
             log.warn("Failed to deserialize redis cache for key {}", key, e);
+            MDC.remove("cache.layer");
             stringRedisTemplate.delete(key);
             return CacheResult.miss();
         }
@@ -53,7 +56,9 @@ public class RedisCacheClient {
             String payload = objectMapper.writeValueAsString(value);
             stringRedisTemplate.opsForValue().set(key, payload, Duration.ofMillis(ttlMs));
         } catch (JsonProcessingException e) {
+            MDC.put("cache.layer", "REDIS");
             log.error("Failed to serialize value to redis for key {}", key, e);
+            MDC.remove("cache.layer");
         }
     }
 

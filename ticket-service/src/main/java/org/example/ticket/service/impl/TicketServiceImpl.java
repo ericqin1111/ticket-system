@@ -17,6 +17,7 @@ import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -71,20 +72,25 @@ public class TicketServiceImpl implements TicketService {
         return cacheTemplate.get(cacheKey, CacheOptions.from(cacheProperties), () -> {
             RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(PRICE_TIER_BLOOM_FILTER);
             if (!bloomFilter.contains(priceTierId)) {
+                MDC.put("cache.layer", "BLOOM");
                 log.warn("[BLOOM FILTER] 拒绝tierId为{}的请求", priceTierId);
+                MDC.remove("cache.layer");
                 return null;
             }
+            MDC.put("cache.layer", "DB");
             log.info("[CACHE MISS] 准备从数据库查询priceTierId:{}", priceTierId);
 
             PriceTier priceTier = priceTierMapper.selectById(priceTierId);
             if (priceTier == null) {
                 log.warn("数据库未能查询到priceTier Id:{}", priceTierId);
+                MDC.remove("cache.layer");
                 return null;
             }
 
             Event event = eventMapper.selectById(priceTier.getEventId());
             Ticket ticket = (event != null) ? ticketMapper.selectById(event.getTicketId()) : null;
 
+            MDC.remove("cache.layer");
             return buildPriceTierDetailDTO(priceTier, event, ticket);
         }, PriceTierDetailDTO.class);
     }
