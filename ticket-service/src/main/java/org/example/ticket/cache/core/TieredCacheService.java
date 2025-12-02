@@ -89,9 +89,9 @@ public class TieredCacheService implements CacheTemplate {
                 T loaded = loader.load();
                 long elapsedMs = sample.stop(loadTimer) / 1_000_000;
                 if (elapsedMs > LOAD_SLOW_THRESHOLD.toMillis()) {
-                    MDC.put("cache.layer", CacheLayer.DB.name());
+                    setCacheLayer(CacheLayer.DB.name());
                     log.warn("DB load slow, key={}, took={}ms", key, elapsedMs);
-                    MDC.remove("cache.layer");
+                    clearCacheLayer();
                 }
                 if (loaded == null) {
                     redisCache.put(key, null, opts.getNegativeTtlMs());
@@ -105,20 +105,30 @@ public class TieredCacheService implements CacheTemplate {
             } catch (Exception ex) {
                 meterRegistry.counter("cache.load.fail").increment();
                 MDC.put("cache.key", key);
-                MDC.put("cache.layer", CacheLayer.DB.name());
+                setCacheLayer(CacheLayer.DB.name());
                 log.error("Cache load failed for key {}", key, ex);
                 if (opts.isAllowDegrade()) {
                     MDC.remove("cache.key");
-                    MDC.remove("cache.layer");
+                    clearCacheLayer();
                     return null;
                 }
                 MDC.remove("cache.key");
-                MDC.remove("cache.layer");
+                clearCacheLayer();
                 throw new RuntimeException(ex);
             } finally {
                 locks.remove(key);
             }
         }
+    }
+
+    private void setCacheLayer(String layer) {
+        MDC.put("cache.layer", layer);
+        MDC.put("cache_layer", layer);
+    }
+
+    private void clearCacheLayer() {
+        MDC.remove("cache.layer");
+        MDC.remove("cache_layer");
     }
 
     @Override

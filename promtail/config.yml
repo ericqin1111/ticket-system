@@ -19,8 +19,6 @@ scrape_configs:
         labels:
           # 这个 job 标签会附加到所有从此配置采集的日志中
           job: ticketing-services
-          service: "dummy"
-          logger_name: "dummy"
           __path__: /logs/*.log # 匹配所有服务下的 .log 文件
 
     pipeline_stages:
@@ -38,7 +36,7 @@ scrape_configs:
             logger_name: logger_name
             traceId: traceId # 提取 traceId
             message: message
-            tmp_cache_layer: "'cache.layer'"
+            cache_layer: cache_layer
 
       # 使用提取出的字段设置 Loki 的标签
       # 标签 (Labels) 是 Loki 高效查询的关键！只为需要频繁过滤的字段设置标签。
@@ -46,7 +44,7 @@ scrape_configs:
           service:
           level:
           logger_name:
-          cache_layer: tmp_cache_layer
+          cache_layer:
 
       - match:
           selector:

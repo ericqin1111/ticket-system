@@ -72,25 +72,25 @@ public class TicketServiceImpl implements TicketService {
         return cacheTemplate.get(cacheKey, CacheOptions.from(cacheProperties), () -> {
             RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(PRICE_TIER_BLOOM_FILTER);
             if (!bloomFilter.contains(priceTierId)) {
-                MDC.put("cache.layer", "BLOOM");
+                setCacheLayer("BLOOM");
                 log.warn("[BLOOM FILTER] 拒绝tierId为{}的请求", priceTierId);
-                MDC.remove("cache.layer");
+                clearCacheLayer();
                 return null;
             }
-            MDC.put("cache.layer", "DB");
+            setCacheLayer("DB");
             log.info("[CACHE MISS] 准备从数据库查询priceTierId:{}", priceTierId);
 
             PriceTier priceTier = priceTierMapper.selectById(priceTierId);
             if (priceTier == null) {
                 log.warn("数据库未能查询到priceTier Id:{}", priceTierId);
-                MDC.remove("cache.layer");
+                clearCacheLayer();
                 return null;
             }
 
             Event event = eventMapper.selectById(priceTier.getEventId());
             Ticket ticket = (event != null) ? ticketMapper.selectById(event.getTicketId()) : null;
 
-            MDC.remove("cache.layer");
+            clearCacheLayer();
             return buildPriceTierDetailDTO(priceTier, event, ticket);
         }, PriceTierDetailDTO.class);
     }
@@ -123,6 +123,16 @@ public class TicketServiceImpl implements TicketService {
     public void evictPriceTierCacher(Long priceTierId) {
         cacheTemplate.invalidate(priceTierCacheKeyBuilder.build(priceTierId));
         log.info("已删除缓存 key:{}",priceTierId);
+    }
+
+    private void setCacheLayer(String layer) {
+        MDC.put("cache.layer", layer);
+        MDC.put("cache_layer", layer);
+    }
+
+    private void clearCacheLayer() {
+        MDC.remove("cache.layer");
+        MDC.remove("cache_layer");
     }
 
     private PriceTierDetailDTO buildPriceTierDetailDTO(PriceTier priceTier, Event event, Ticket ticket) {

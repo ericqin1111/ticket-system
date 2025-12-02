@@ -39,9 +39,9 @@ public class RedisCacheClient {
         try {
             return CacheResult.hit(objectMapper.readValue(raw, type));
         } catch (JsonProcessingException e) {
-            MDC.put("cache.layer", "REDIS");
+            setCacheLayer("REDIS");
             log.warn("Failed to deserialize redis cache for key {}", key, e);
-            MDC.remove("cache.layer");
+            clearCacheLayer();
             stringRedisTemplate.delete(key);
             return CacheResult.miss();
         }
@@ -56,13 +56,23 @@ public class RedisCacheClient {
             String payload = objectMapper.writeValueAsString(value);
             stringRedisTemplate.opsForValue().set(key, payload, Duration.ofMillis(ttlMs));
         } catch (JsonProcessingException e) {
-            MDC.put("cache.layer", "REDIS");
+            setCacheLayer("REDIS");
             log.error("Failed to serialize value to redis for key {}", key, e);
-            MDC.remove("cache.layer");
+            clearCacheLayer();
         }
     }
 
     public void invalidate(String key) {
         stringRedisTemplate.delete(key);
+    }
+
+    private void setCacheLayer(String layer) {
+        MDC.put("cache.layer", layer);
+        MDC.put("cache_layer", layer);
+    }
+
+    private void clearCacheLayer() {
+        MDC.remove("cache.layer");
+        MDC.remove("cache_layer");
     }
 }

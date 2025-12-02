@@ -28,6 +28,7 @@
                     <includeMdcKeyName>traceId</includeMdcKeyName>
                     <includeMdcKeyName>spanId</includeMdcKeyName>
                     <includeMdcKeyName>cache.layer</includeMdcKeyName>
+                    <includeMdcKeyName>cache_layer</includeMdcKeyName>
                 </mdc>
                 <tracing/>
                 <globalCustomFields>
