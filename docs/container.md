@@ -10,11 +10,10 @@
 | prometheus-ticket | prom/prometheus:2.45.0 | 9090 | 指标采集（Micrometer） | `./prometheus/prometheus.yml` 挂载，`prometheus-data:/prometheus` |
 | grafana-ticket | grafana/grafana:9.5.3 | 3000 | 指标可视化 | `grafana-data:/var/lib/grafana`，默认账号 admin/admin |
 | loki | grafana/loki:2.9.2 | 3100 | 日志聚合 | - |
-| promtail | grafana/promtail:2.9.2 | 9080 | 日志收集到 Loki | 挂载 `./promtail` 配置与 `./logs` 日志目录 |
+| alloy | grafana/alloy:1.2.1 | - | 日志采集分流（Loki + Kafka `logs_agent_stream`） | 挂载 `./agent-flow/config.river` 与 `./logs` |
 | connect-ticket | debezium/connect:2.1 | 18083 | Debezium Kafka Connect，同步 MySQL Binlog 至 Kafka | 依赖 kafka；topics: configs/offsets/status |
 | connect-configurator-ticket | curlimages/curl:latest | - | 启动时自动调用 Connect API 注册 Debezium 任务 | 挂载 `./connect-conf` ，失败自动重试 |
 
 ## 网络与卷
 - 网络：`ticket-system-net` (bridge) 供所有容器互通。
 - 数据卷：`mysql-data`、`redis-data`、`nacos-logs`、`prometheus-data`、`grafana-data`（由 compose 管理）。
-

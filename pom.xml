@@ -18,6 +18,7 @@
         <module>inventory-service</module>
         <module>user-service</module>
         <module>gateway-service</module>
+        <module>agent-service</module>
     </modules>
 
     <url/>

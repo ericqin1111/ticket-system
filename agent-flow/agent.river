@@ -1,0 +1,74 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+//////////////////////////////////////////////////////
+// 1. 用 local.file_match 发现 /logs/*.log 文件
+//////////////////////////////////////////////////////
+
+local.file_match "logs" {
+  path_targets = [{
+    __path__ = "/logs/*.log",
+  }]
+}
+
+//////////////////////////////////////////////////////
+// 2. 从文件中读日志，交给 loki.process
+//////////////////////////////////////////////////////
+
+loki.source.file "logs" {
+  // 使用上面 file_match 发现到的文件
+  targets    = local.file_match.logs.targets
+  forward_to = [loki.process.logs.receiver]
+
+   tail_from_end = true
+}
+
+//////////////////////////////////////////////////////
+// 3. 日志处理：regex 提取 service，json 提取字段，转成 labels
+//////////////////////////////////////////////////////
+
+loki.process "logs" {
+  // 从文件名提取 service，比如 /logs/ticket-service.log
+  stage.regex {
+    expression = ".*/(?P<service>[^.]+)\\.log$"
+    source     = "filename"
+  }
+
+  // 从 JSON log 里提取字段
+  stage.json {
+    expressions = {
+      level       = "level",
+      logger_name = "logger_name",
+      traceId     = "traceId",
+      message     = "message",
+      cache_layer = "cache_layer",
+    }
+  }
+
+  // 把这些字段挂成 label
+  stage.labels {
+    values = {
+      service     = "",
+      level       = "",
+      logger_name = "",
+      cache_layer = "",
+    }
+  }
+
+  // 目前先只写 Loki，Kafka 先不要
+  forward_to = [
+    loki.write.default.receiver,
+  ]
+}
+
+//////////////////////////////////////////////////////
+// 4. 写入 Loki
+//////////////////////////////////////////////////////
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

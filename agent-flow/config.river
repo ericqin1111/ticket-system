@@ -1,0 +1,102 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// 发现文件，相当于 __path__: /logs/*.log
+local.file_match "logs" {
+  path_targets = [{ "__path__" = "/logs/*.log" }]
+}
+
+// 从文件读日志，相当于 scrape_configs + positions
+loki.source.file "logs" {
+  targets        = local.file_match.logs.targets
+  tail_from_end  = true
+
+
+
+  // 日志送给处理阶段
+  forward_to = [loki.process.logs.receiver]
+}
+
+// 处理：regex -> json -> labels （完全对应 pipeline_stages）
+loki.process "logs" {
+  // regex: 从文件名提服务
+  stage.regex {
+    expression = ".*/(?P<service>[^.]+)\\.log$"
+    source     = "filename"
+  }
+
+  // json: 提取字段
+  stage.json {
+    expressions = {
+      level       = "level",
+      logger_name = "logger_name",
+      traceId     = "traceId",
+      message     = "message",
+      cache_layer = "cache_layer",
+    }
+  }
+
+  // labels: 设置 Loki 标签
+  stage.labels {
+    values = {
+      job         = "ticketing-services",
+      service     = "",
+      level       = "",
+      logger_name = "",
+      cache_layer = "",
+    }
+  }
+
+  // ⚠️ 关键：这里“一拖二”
+  // 1. 写 Loki（替代 Promtail）
+  // 2. 进入 OTEL 管线 → Kafka（你原来要的分流）
+  forward_to = [
+    loki.write.loki_default.receiver,
+    otelcol.receiver.loki.logs.receiver,
+  ]
+}
+
+// === 1) 写 Loki：替代 Promtail 的 clients + batch 配置 ===
+loki.write "loki_default" {
+  endpoint {
+    url        = "http://loki:3100/loki/api/v1/push"
+
+    // 对应 Promtail clients 的 batchsize / batchwait
+    // Alloy 文档里是 batch_size/batch_wait，类型是 string/duration
+    // 默认为 1MiB / 1s，这里按你原来的 1MB / 5s 来配
+    batch_size = "1MiB"
+    batch_wait = "5s"
+  }
+}
+
+// === 2) Loki entry → OTLP → Kafka：你之前的 Kafka 分流 ===
+
+// Loki → OTLP bridge
+otelcol.receiver.loki "logs" {
+  output {
+    logs = [otelcol.processor.batch.logs.input]
+  }
+}
+
+// 批处理：控制 Kafka 前的 batch 行为
+otelcol.processor.batch "logs" {
+  send_batch_size = 100
+  timeout         = "5s"
+
+  output {
+    logs = [otelcol.exporter.kafka.logs.input]
+  }
+}
+
+// Kafka 输出
+otelcol.exporter.kafka "logs" {
+  brokers          = ["kafka-ticket:9092"]
+  protocol_version = "2.0.0"     // 按你的 Kafka 版本调整
+
+  logs {
+    encoding = "otlp_json"
+    topic    = "logs_agent_stream"
+  }
+}

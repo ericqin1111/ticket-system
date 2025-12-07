@@ -1,0 +1,26 @@
+kafka:
+  bootstrap_servers: "localhost:29092"
+  topic: "logs_agent_stream"
+  group_id: "agent-log-consumer"
+  enable_auto_commit: false
+  max_poll_records: 200
+  max_poll_interval_ms: 300000
+  session_timeout_ms: 10000
+#  security_protocol: "SASL_PLAINTEXT"
+#  sasl_mechanism: "PLAIN"
+#  sasl_username: ""
+#  sasl_password: ""
+
+audit:
+  enabled: true
+  file_path: "./logs/agent/audit.log"
+  sampling_rate: 1.0
+
+filter:
+  levels:
+    - "ERROR"
+    - "WARN"
+  whitelist_patterns:
+    - "\\[CACHE MISS\\]"
+    - "\\[BLOOM FILTER\\]"
+    - "took=\\d+ms"
