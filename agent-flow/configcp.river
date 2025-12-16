@@ -16,11 +16,11 @@ loki.source.file "logs" {
 
 
   // 日志送给处理阶段
-  forward_to = [loki.process.parse.receiver]
+  forward_to = [loki.process.logs.receiver]
 }
 
 // 处理：regex -> json -> labels （完全对应 pipeline_stages）
-loki.process "parse" {
+loki.process "logs" {
   // regex: 从文件名提服务
   stage.regex {
     expression = ".*/(?P<service>[^.]+)\\.log$"
@@ -38,13 +38,10 @@ loki.process "parse" {
     }
   }
 
-  stage.static_labels{
-    values = {job = "ticketing-services"}
-  }
-
   // labels: 设置 Loki 标签
   stage.labels {
     values = {
+      job         = "ticketing-services",
       service     = "",
       level       = "",
       logger_name = "",
@@ -57,47 +54,8 @@ loki.process "parse" {
   // 2. 进入 OTEL 管线 → Kafka（你原来要的分流）
   forward_to = [
     loki.write.loki_default.receiver,
-    loki.process.kafka_filter.receiver,
+    otelcol.receiver.loki.logs.receiver,
   ]
-}
-
-loki.process "kafka_filter" {
-  // 默认：不放行
-  stage.static_labels { values = { allow = "0" } }
-
-  // levels: ERROR/WARN 全放行
-  stage.match {
-    selector = "{level=~\"ERROR|WARN\"}"
-    stage.static_labels { values = { allow = "1" } }
-  }
-
-  // INFO 白名单：包含 [CACHE MISS]
-  stage.match {
-    selector = "{level=\"INFO\"} |= \"[CACHE MISS]\""
-    stage.static_labels { values = { allow = "1" } }
-  }
-
-  // INFO 白名单：包含 [BLOOM FILTER]
-  stage.match {
-    selector = "{level=\"INFO\"} |= \"[BLOOM FILTER]\""
-    stage.static_labels { values = { allow = "1" } }
-  }
-
-  // INFO 白名单：took=\d+ms（用 [0-9]+ 避免转义地狱）
-  stage.match {
-    selector = "{level=\"INFO\"} |~ \"took=[0-9]+ms\""
-    stage.static_labels { values = { allow = "1" } }
-  }
-
-  // 没放行的全部丢弃
-  stage.match {
-    selector = "{allow=\"0\"}"
-    action   = "drop"
-    drop_counter_reason = "not_whitelisted"
-  }
-
-  // 只有过滤后的才进入 OTEL -> Kafka
-  forward_to = [otelcol.receiver.loki.logs.receiver]
 }
 
 // === 1) 写 Loki：替代 Promtail 的 clients + batch 配置 ===
@@ -112,7 +70,6 @@ loki.write "loki_default" {
     batch_wait = "5s"
   }
 }
-
 
 // === 2) Loki entry → OTLP → Kafka：你之前的 Kafka 分流 ===
 

@@ -4,6 +4,7 @@ import time
 from .config import AppConfig
 from .consumer import LogStreamConsumer
 
+logger = logging.getLogger(__name__)
 
 def run():
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -14,6 +15,7 @@ def run():
     try:
         while True:
             consumer.poll_and_process()
+
     except KeyboardInterrupt:  # pragma: no cover
         pass
     finally:

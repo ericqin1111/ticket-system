@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional,Any, Dict, Iterator
 
 from .config import AppConfig
 from .models import LogEvent, NormalizedEvent
@@ -65,36 +65,73 @@ class LogStreamConsumer:
                 return
             logger.error("Kafka error: %s", msg.error())
             return
+        
+        logger.info("got msg offset=%s bytes=%s", msg.offset(), len(msg.value() or b""))
         try:
             raw_obj = json.loads(msg.value())
-            raw_event = LogEvent.from_dict(raw_obj)
         except Exception as ex:  # pragma: no cover
             logger.exception("Failed to decode message: %s", ex)
             return
-        norm = self.normalizer.normalize(
-            raw_event, msg.topic(), msg.partition(), msg.offset()
-        )
-        if not norm:
-            logger.debug("Dropped message due to normalization failure: %s", raw_obj)
-            return
-        if not self.log_filter.allow(norm):
-            logger.debug(
-                "Filtered out message level=%s service=%s msg=%s",
-                norm.level,
-                norm.service,
-                norm.message,
-            )
-            return
-        self.audit_sink.write(norm)
-        self.on_event(norm)
-        logger.debug(
-            "Processed message level=%s service=%s offset=%s",
-            norm.level,
-            norm.service,
-            msg.offset(),
-        )
-        if not self.cfg.kafka.enable_auto_commit:
+        
+        processed_any = False
+        cnt=0
+        for raw_event in self.iter_log_events_from_payload(raw_obj):
+            cnt += 1
+            norm = self.normalizer.normalize(raw_event, msg.topic(), msg.partition(), msg.offset())
+            if not norm:
+                continue
+            if not self.log_filter.allow(norm):
+                continue
+            self.audit_sink.write(norm)
+            self.on_event(norm)
+            logger.info("offset=%s expanded_logrecords=%s processed_any=%s", msg.offset(), cnt, processed_any)
+            processed_any = True
+        if processed_any and (not self.cfg.kafka.enable_auto_commit):
             self.consumer.commit(message=msg, asynchronous=False)
+
+
+    def iter_log_events_from_payload(self,payload: Any) -> Iterator[LogEvent]:
+        """
+        Accepts:
+        - OTLP JSON dict: {"resourceLogs":[{"scopeLogs":[{"logRecords":[...]}]}]}
+        - list (rare): [ ... ]  (we'll traverse)
+        - plain dict (non-OTLP): {"level":..., "message":...}
+        Yields LogEvent per logRecord (for OTLP) or one event otherwise.
+        """
+        # Some producers might wrap multiple messages as a list
+        if isinstance(payload, list):
+            for item in payload:
+                yield from self.iter_log_events_from_payload(item)
+            return
+
+        # Non-dict payload -> cannot parse structurally, fall back to raw string
+        if not isinstance(payload, dict):
+            yield LogEvent.from_dict({"message": str(payload), "raw": {"payload": payload}})
+            return
+
+        # OTLP payload
+        if "resourceLogs" in payload:
+            resource_logs = payload.get("resourceLogs") or []
+            for rl in resource_logs:
+                scope_logs = rl.get("scopeLogs") or rl.get("scope_logs") or []
+                for sl in scope_logs:
+                    log_records = sl.get("logRecords") or sl.get("log_records") or []
+                    for lr in log_records:
+                        # build a minimal OTLP wrapper containing exactly one logRecord
+                        one = {
+                            "resourceLogs": [{
+                                "resource": rl.get("resource", {}),
+                                "scopeLogs": [{
+                                    "scope": sl.get("scope", {}),
+                                    "logRecords": [lr],
+                                }],
+                            }]
+                        }
+                        yield LogEvent.from_dict(one)
+            return
+
+        # Non-OTLP dict -> single event
+        yield LogEvent.from_dict(payload)
 
     def close(self):
         try:
@@ -102,3 +139,4 @@ class LogStreamConsumer:
                 self.consumer.close()
         finally:
             self.audit_sink.close()
+
